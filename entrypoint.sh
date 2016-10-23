@@ -116,33 +116,39 @@ fi
     rm -rf /etc/letsencrypt/{live,archive,keys,renewal}
    
    echo "letsencrypt certonly "${letscmd}" \
-    --standalone \
+    --standalone --text \
     "${SERVER}" \
     --email "${EMAIL}" --agree-tos \
     --expand " > /etc/nginx/lets
+    
+    echo "Running initial certificate request... "
     /bin/bash /etc/nginx/lets
   fi
 
 #update the stored SAN list
 echo "${DOMAIN}" > /etc/letsencrypt/san_list
 
+#Create the renewal directory (containing well-known challenges)
+mkdir -p /etc/letsencrypt/webrootauth/
+
 # Template a cronjob to reissue the certificate with the webroot authenticator
+echo "Creating a cron job to keep the certificate updated"
   cat <<EOF >/etc/periodic/monthly/reissue
-  #!/bin/sh
+#!/bin/sh
 
-  set -euo pipefail
+set -euo pipefail
 
-  # Certificate reissue
-  letsencrypt certonly --force-renewal \
-    --webroot \
-    -w /etc/letsencrypt/webrootauth/ \
-    ${letscmd} \
-    "${SERVER}" \
-    --email "${EMAIL}" --agree-tos \
-    --expand
+# Certificate reissue
+letsencrypt certonly --force-renewal \
+--webroot --text \
+-w /etc/letsencrypt/webrootauth/ \
+${letscmd} \
+${SERVER} \
+--email "${EMAIL}" --agree-tos \
+--expand
 
-  # Reload nginx configuration to pick up the reissued certificates
-  /usr/sbin/nginx -s reload
+# Reload nginx configuration to pick up the reissued certificates
+/usr/sbin/nginx -s reload
 EOF
 
 chmod +x /etc/periodic/monthly/reissue
